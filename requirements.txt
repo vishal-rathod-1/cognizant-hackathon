@@ -1,0 +1,5 @@
+Flask
+SQLAlchemy
+cryptography
+python-dotenv
+sqlite3

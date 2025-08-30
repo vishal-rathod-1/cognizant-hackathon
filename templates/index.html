@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card p-4 h-100">
+        <h3 class="mb-2">Welcome{% if username %}, {{ username }}{% endif %} 👋</h3>
+        <p class="muted">Store PII with <b>AES‑256‑GCM</b> using keys derived from your password + salt via <b>PBKDF2‑SHA256</b>. Only ciphertext lives in the database.</p>
+        <ul class="mb-0">
+          <li>Unique per‑user salts for login and key derivation</li>
+          <li>Fresh 12‑byte nonce per encryption</li>
+          <li>Decryption requires your password‑derived key</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card p-4 h-100">
+        <h5 class="mb-3"><i class="bi bi-rocket-takeoff me-2"></i>Quick start</h5>
+        {% if not session.get('uid') %}
+        <a href="/register" class="btn btn-brand w-100 mb-2">Create account</a>
+        <a href="/login" class="btn btn-outline-light w-100">Login</a>
+        {% else %}
+        <a href="/pii" class="btn btn-brand w-100">Go to My PII</a>
+        {% endif %}
+        <hr class="my-3">
+        <div class="small muted">Tip: in a real deployment use Argon2/bcrypt for <i>auth</i> hashing; PBKDF2 here is used for key derivation.</div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

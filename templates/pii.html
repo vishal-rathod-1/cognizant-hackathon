@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card p-4">
+      <h5 class="mb-3"><i class="bi bi-shield-lock me-2"></i>Save / Update PII</h5>
+      <form method="post">
+        <div class="mb-3"><label class="form-label">Full Name</label><input class="form-control" name="name" placeholder="Alice Doe"></div>
+        <div class="mb-3"><label class="form-label">Email</label><input class="form-control" name="email" placeholder="alice@example.com"></div>
+        <div class="mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" placeholder="+91-9876543210"></div>
+        <div class="mb-3"><label class="form-label">Address</label><input class="form-control" name="address" placeholder="Bengaluru, KA"></div>
+        <button class="btn btn-brand w-100" type="submit">Encrypt & Save</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card p-4">
+      <h5 class="mb-3"><i class="bi bi-unlock me-2"></i>Your decrypted PII (server-side)</h5>
+      {% if decrypted %}
+      <table class="table table-dark table-striped align-middle">
+        <tbody>
+          {% for k, v in decrypted.items() %}
+          <tr><th class="w-25 text-capitalize">{{k}}</th><td>{{v}}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="muted">No PII saved yet.</div>
+      {% endif %}
+    </div>
+    <div class="card p-4 mt-3">
+      <h6 class="mb-2"><i class="bi bi-database-lock me-2"></i>DB view (ciphertext preview)</h6>
+      <div class="small muted">Shows nonce & ciphertext (truncated) to demonstrate encryption at rest.</div>
+      <ul class="mt-2">
+        {% for r in records %}
+          <li><code>{{ r.field_name }}</code> → nonce={{ r.nonce_b64[:8] }}… ct={{ r.ciphertext_b64[:22] }}…</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
