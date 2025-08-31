@@ -27,7 +27,13 @@ def inject_globals():
 
 @app.get("/")
 def index():
-    return render_template("index.html", title="Home")
+    db = db_sess()
+    try:
+        user_count = db.query(User).count()
+    finally:
+        db.close()
+    return render_template("index.html", title="Home", user_count=user_count)
+
 
 @app.route("/register", methods=["GET","POST"])
 def register():
