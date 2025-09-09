@@ -253,6 +253,11 @@ def change_password():
         old_key = derive_key(old_pw, user.kdf_salt_b64, user.kdf_iters)
         new_key = derive_key(new_pw, user.kdf_salt_b64, user.kdf_iters)
 
+        # condition to avoid re-encrypting with same password
+        if old_pw == new_pw:
+            flash("New password cannot be the same as the old password.", "warning")
+            return redirect(url_for("change_password"))
+        
         # re-encrypt all user PII rows
         rows = db.execute(select(PIIRecord).where(PIIRecord.owner_id==user.id)).scalars().all()
         reenc = 0
