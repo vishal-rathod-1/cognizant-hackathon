@@ -107,42 +107,100 @@ def logout():
     flash("Logged out.", "info")
     return redirect(url_for("index"))
 
-@app.route("/pii", methods=["GET","POST"])
+import re
+from flask import flash, redirect, render_template, request, session, url_for
+from sqlalchemy import select
+
+@app.route("/pii", methods=["GET", "POST"])
 def pii():
-    if "uid" not in session: 
-        flash("Please log in first.", "warning"); return redirect(url_for("login"))
+    if "uid" not in session:
+        flash("Please log in first.", "warning")
+        return redirect(url_for("login"))
+
     db = db_sess()
     try:
         user = db.get(User, session["uid"])
+        
         if request.method == "POST":
             incoming = {
-                "name": request.form.get("name","").strip(),
-                "email": request.form.get("email","").strip(),
-                "phone": request.form.get("phone","").strip(),
-                "address": request.form.get("address","").strip(),
+                "name": request.form.get("name", "").strip(),
+                "email": request.form.get("email", "").strip(),
+                "phone": request.form.get("phone", "").strip(),
+                "address": request.form.get("address", "").strip(),
             }
+
+            # ---------------------------
+            # VALIDATION
+            # ---------------------------
+            errors = []
+
+            # Validate email format
+            if incoming["email"]:
+                email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+                if not re.match(email_regex, incoming["email"]):
+                    errors.append("Invalid email format.")
+
+            # Validate phone number (10 digits only)
+            if incoming["phone"]:
+                phone_regex = r'^\d{10}$'
+                if not re.match(phone_regex, incoming["phone"]):
+                    errors.append("Phone number must be exactly 10 digits.")
+
+            # If there are validation errors, stop and return
+            if errors:
+                for err in errors:
+                    flash(err, "danger")
+                return redirect(url_for("pii"))
+
+            # ---------------------------
+            # ENCRYPT & SAVE
+            # ---------------------------
             key = base64.b64decode(session["key_b64"])
             saved = 0
+
             for field, value in incoming.items():
-                if not value: 
+                if not value:
                     continue
+
                 aad = f"{user.username}|{field}".encode()
                 nonce_b64, ct_b64 = aesgcm_encrypt(key, value.encode(), aad)
-                # Upsert: delete existing field then add new
-                exist = db.execute(select(PIIRecord).where(PIIRecord.owner_id==user.id, PIIRecord.field_name==field)).scalar_one_or_none()
+
+                # Upsert: delete existing field, then add new
+                exist = db.execute(
+                    select(PIIRecord).where(
+                        PIIRecord.owner_id == user.id,
+                        PIIRecord.field_name == field
+                    )
+                ).scalar_one_or_none()
+
                 if exist:
                     db.delete(exist)
-                rec = PIIRecord(owner_id=user.id, field_name=field, nonce_b64=nonce_b64, ciphertext_b64=ct_b64)
-                db.add(rec); saved += 1
+
+                rec = PIIRecord(
+                    owner_id=user.id,
+                    field_name=field,
+                    nonce_b64=nonce_b64,
+                    ciphertext_b64=ct_b64
+                )
+                db.add(rec)
+                saved += 1
+
             if saved:
-                db.commit(); flash("Saved & encrypted your fields.", "success")
+                db.commit()
+                flash("Saved & encrypted your fields.", "success")
             else:
                 flash("Nothing to save.", "warning")
+
             return redirect(url_for("pii"))
 
-        # GET: fetch and decrypt to show
+        # ---------------------------
+        # GET: FETCH & DECRYPT
+        # ---------------------------
         key = base64.b64decode(session["key_b64"])
-        records = db.execute(select(PIIRecord).where(PIIRecord.owner_id==user.id)).scalars().all()
+        records = db.execute(
+            select(PIIRecord).where(PIIRecord.owner_id == user.id)
+        ).scalars().all()
+
         decrypted = {}
         for r in records:
             try:
@@ -151,9 +209,13 @@ def pii():
                 decrypted[r.field_name] = pt
             except Exception:
                 decrypted[r.field_name] = "***DECRYPTION_ERROR***"
+
         return render_template("pii.html", title="My PII", decrypted=decrypted, records=records)
+
     finally:
         db.close()
+
+
 @app.route("/change-password", methods=["GET","POST"])
 def change_password():
     if "uid" not in session: 
