@@ -9,10 +9,28 @@
           <label class="form-label">Username</label>
           <input class="form-control" name="username" required>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Password</label>
-          <input class="form-control" type="password" name="password" required>
-        </div>
+        <div class="mb-3 position-relative">
+  <label class="form-label">Password</label>
+  <div class="input-group">
+    <input id="passwordField" class="form-control" type="password" name="password" required>
+    <button type="button" class="btn btn-outline-secondary" onclick="togglePassword()">Show</button>
+  </div>
+</div>
+
+<script>
+function togglePassword() {
+  const pwField = document.getElementById("passwordField");
+  const btn = event.target;
+  if (pwField.type === "password") {
+    pwField.type = "text";
+    btn.textContent = "Hide";
+  } else {
+    pwField.type = "password";
+    btn.textContent = "Show";
+  }
+}
+</script>
+
         <button class="btn btn-brand w-100" type="submit">Register</button>
       </form>
     </div>

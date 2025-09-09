@@ -7,6 +7,10 @@ from models import Base, User, PIIRecord
 from crypto_utils import (
     new_salt_b64, sha256_auth_hash, derive_key, aesgcm_encrypt,validate_password, aesgcm_decrypt, PBKDF2_ITERS, b64e
 )
+import re
+from flask import flash, redirect, render_template, request, session, url_for
+from sqlalchemy import select
+
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///cipherkeep_ui.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32))
@@ -107,9 +111,6 @@ def logout():
     flash("Logged out.", "info")
     return redirect(url_for("index"))
 
-import re
-from flask import flash, redirect, render_template, request, session, url_for
-from sqlalchemy import select
 
 @app.route("/pii", methods=["GET", "POST"])
 def pii():
