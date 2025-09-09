@@ -33,3 +33,23 @@ def aesgcm_decrypt(key: bytes, nonce_b64: str, ct_b64: str, aad: Optional[bytes]
     nonce = b64d(nonce_b64)
     ct = b64d(ct_b64)
     return AESGCM(key).decrypt(nonce, ct, aad)
+
+import re
+
+def validate_password(password: str):
+    """
+    Validates password with rules:
+    - Min length 6
+    - At least one lowercase
+    - At least one uppercase
+    - At least one symbol
+    """
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters long."
+    if not re.search(r"[a-z]", password):
+        return False, "Password must include at least one lowercase letter."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must include at least one uppercase letter."
+    if not re.search(r"[^A-Za-z0-9]", password):
+        return False, "Password must include at least one symbol."
+    return True, ""
