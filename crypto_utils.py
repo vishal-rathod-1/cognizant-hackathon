@@ -44,8 +44,13 @@ def validate_password(password: str):
     - At least one uppercase
     - At least one symbol
     """
+<<<<<<< HEAD
     if len(password) < 8:
         return False, "Password must be at least 8 characters long."
+=======
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters long."
+>>>>>>> afa683738c68f08a698c469c29a170072d75322f
     if not re.search(r"[a-z]", password):
         return False, "Password must include at least one lowercase letter."
     if not re.search(r"[A-Z]", password):
