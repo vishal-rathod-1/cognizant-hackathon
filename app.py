@@ -5,14 +5,14 @@ from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import sessionmaker, scoped_session
 from models import Base, User, PIIRecord
 from crypto_utils import (
-    new_salt_b64, sha256_auth_hash, derive_key, aesgcm_encrypt, aesgcm_decrypt, PBKDF2_ITERS, b64e
+    new_salt_b64, sha256_auth_hash, derive_key, aesgcm_encrypt,validate_password, aesgcm_decrypt, PBKDF2_ITERS, b64e
 )
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///cipherkeep_ui.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32))
 
 app = Flask(__name__)
-app.config.update(SECRET_KEY=SECRET_KEY, PERMANENT_SESSION_LIFETIME=timedelta(hours=8))
+app.config.update(SECRET_KEY=SECRET_KEY, PERMANENT_SESSION_LIFETIME=timedelta(hours=1))
 
 engine = create_engine(DATABASE_URL, future=True)
 Base.metadata.create_all(engine)
@@ -39,27 +39,41 @@ def index():
 def register():
     if request.method == "GET":
         return render_template("register.html", title="Register")
+
     username = request.form.get("username","").strip()
     password = request.form.get("password","")
+
     if not username or not password:
         flash("Please provide username and password.", "danger")
         return redirect(url_for("register"))
+
+    # ✅ Password policy check here
+    valid, msg = validate_password(password)
+    if not valid:
+        flash(msg, "danger")
+        return redirect(url_for("register"))
+
     db = db_sess()
     try:
         exists = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
         if exists:
             flash("Username already exists.", "warning")
             return redirect(url_for("register"))
+
         auth_salt_b64 = new_salt_b64()
         kdf_salt_b64  = new_salt_b64()
         auth_hash_b64 = b64e(sha256_auth_hash(password, auth_salt_b64))
-        user = User(username=username, auth_salt_b64=auth_salt_b64, auth_hash_b64=auth_hash_b64,
-                    kdf_salt_b64=kdf_salt_b64, kdf_iters=PBKDF2_ITERS)
+
+        user = User(username=username, auth_salt_b64=auth_salt_b64,
+                    auth_hash_b64=auth_hash_b64, kdf_salt_b64=kdf_salt_b64,
+                    kdf_iters=PBKDF2_ITERS)
         db.add(user); db.commit()
+
         flash("Account created. Please log in.", "success")
         return redirect(url_for("login"))
     finally:
         db.close()
+
 
 @app.route("/login", methods=["GET","POST"])
 def login():
@@ -140,29 +154,42 @@ def pii():
         return render_template("pii.html", title="My PII", decrypted=decrypted, records=records)
     finally:
         db.close()
-
 @app.route("/change-password", methods=["GET","POST"])
 def change_password():
     if "uid" not in session: 
-        flash("Please log in first.", "warning"); return redirect(url_for("login"))
+        flash("Please log in first.", "warning")
+        return redirect(url_for("login"))
+
     db = db_sess()
     try:
         user = db.get(User, session["uid"])
+
         if request.method == "GET":
             return render_template("change_password.html", title="Change Password")
+
         old_pw = request.form.get("old_password","")
         new_pw = request.form.get("new_password","")
+
         if not old_pw or not new_pw:
             flash("Both old and new passwords are required.", "danger")
             return redirect(url_for("change_password"))
-        # verify old password
+
+        # ✅ verify old password
         calc = b64e(sha256_auth_hash(old_pw, user.auth_salt_b64))
         if calc != user.auth_hash_b64:
             flash("Old password is incorrect.", "danger")
             return redirect(url_for("change_password"))
+
+        # ✅ enforce password policy on new password
+        valid, msg = validate_password(new_pw)
+        if not valid:
+            flash(msg, "danger")
+            return redirect(url_for("change_password"))
+
         # derive keys
         old_key = derive_key(old_pw, user.kdf_salt_b64, user.kdf_iters)
         new_key = derive_key(new_pw, user.kdf_salt_b64, user.kdf_iters)
+
         # re-encrypt all user PII rows
         rows = db.execute(select(PIIRecord).where(PIIRecord.owner_id==user.id)).scalars().all()
         reenc = 0
@@ -176,13 +203,16 @@ def change_password():
                 reenc += 1
             except Exception:
                 pass
+
         # update auth hash to new password (keeping same auth_salt for simplicity)
         user.auth_hash_b64 = b64e(sha256_auth_hash(new_pw, user.auth_salt_b64))
         db.commit()
+
         # update session key
         session["key_b64"] = base64.b64encode(new_key).decode()
         flash(f"Password changed. Re-encrypted {reenc} record(s).", "success")
         return redirect(url_for("pii"))
+
     finally:
         db.close()
 
